@@ -162,58 +162,62 @@ async def retry_request(
 @scheduler.scheduled_job(
     CronTrigger(hour=3, minute=0, timezone=timezone), id="update_ships"
 )
-async def update_player_daily_statistic():
-    accounts = await Account.all().values("account_id", "server")
-    wpi = WPIClient(api_config.get_application_id(), 3)
-    detail_tasks = []
-    stat_tasks = []
-    server2account_ids = defaultdict(list)
-    for account in accounts:
-        account_id = account["account_id"]
-        server = Server2url[account["server"]]
-        server2account_ids[server].append(account_id)
-    curr_date = datetime.date.today()
-    async with asyncio.TaskGroup() as tg:
-        for server, account_ids in server2account_ids.items():
-            detail_tasks.append(
-                tg.create_task(
-                    retry_request(wpi.player.personal_data, server, account_ids)
+async def update_player_daily_statistic(retry=0):
+    if retry > 5:
+        return
+    try:
+        accounts = await Account.all().values("account_id", "server")
+        wpi = WPIClient(api_config.get_application_id(), 3)
+        detail_tasks = []
+        stat_tasks = []
+        server2account_ids = defaultdict(list)
+        for account in accounts:
+            account_id = account["account_id"]
+            server = Server2url[account["server"]]
+            server2account_ids[server].append(account_id)
+        curr_date = datetime.date.today()
+        async with asyncio.TaskGroup() as tg:
+            for server, account_ids in server2account_ids.items():
+                detail_tasks.append(
+                    tg.create_task(
+                        retry_request(wpi.player.personal_data, server, account_ids)
+                    )
                 )
-            )
-            stat_tasks.append(
-                tg.create_task(
-                    retry_request(wpi.warships.statistics, server, account_ids)
+                stat_tasks.append(
+                    tg.create_task(
+                        retry_request(wpi.warships.statistics, server, account_ids)
+                    )
                 )
+
+        aid2data = defaultdict(dict)
+        for task in detail_tasks:
+            for detail in task.result():
+                if detail:
+                    aid = detail['account_id']
+                    aid2data[aid]['detail'] = detail
+        for task in stat_tasks:
+            for stat in task.result():
+                if stat and stat[0]:
+                    aid = stat[0]['account_id']
+                    aid2data[aid]['stat'] = stat
+
+        player_daily_statistics = []
+
+        for aid, data in aid2data.items():
+            detail = data.get('detail', None)
+            stat = data.get('stat', None)
+            if not detail and stat:
+                continue
+            player = Player()
+            player.init_user(detail, stat, -1, None, "")
+            await player.async_init(stat)
+            player_daily_statistics.extend(
+                await PlayerDailyStatistic.create_from_player(player, curr_date)
             )
 
-    aid2data = defaultdict(dict)
-    for task in detail_tasks:
-        for detail in task.result():
-            if detail:
-                aid = detail['account_id']
-                aid2data[aid]['detail'] = detail
-    for task in stat_tasks:
-        for stat in task.result():
-            if stat and stat[0]:
-                aid = stat[0]['account_id']
-                aid2data[aid]['stat'] = stat
-
-    player_daily_statistics = []
-
-    for aid, data in aid2data.items():
-        detail = data.get('detail', None)
-        stat = data.get('stat', None)
-        if not detail and stat:
-            continue
-        player = Player()
-        player.init_user(detail, stat, -1, None, "")
-        await player.async_init(stat)
-        player_daily_statistics.extend(
-            await PlayerDailyStatistic.create_from_player(player, curr_date)
+        await PlayerDailyStatistic.bulk_create(
+            player_daily_statistics,
         )
-
-    await PlayerDailyStatistic.bulk_create(
-        player_daily_statistics,
-        on_conflict=["account_id", "ship_id", "last_battle_at"],
-        update_fields=["date"],
-    )
+    except Exception as e:
+        logger.error(str(e))
+        update_player_daily_statistic(retry=retry + 1)
