@@ -220,4 +220,4 @@ async def update_player_daily_statistic(retry=0):
         )
     except Exception as e:
         logger.error(str(e))
-        update_player_daily_statistic(retry=retry + 1)
+        await update_player_daily_statistic(retry=retry + 1)

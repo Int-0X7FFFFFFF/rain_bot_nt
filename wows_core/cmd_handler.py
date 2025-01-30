@@ -26,6 +26,7 @@ async def init_db():
     await Tortoise.init(
         db_url=db_config.conn,
         modules={"models": ["wows_core.models.account", "wows_core.models.daily_statistic"]},
+        timezone="Asia/Shanghai",
     )
     # Generate the schema
     await Tortoise.generate_schemas()
