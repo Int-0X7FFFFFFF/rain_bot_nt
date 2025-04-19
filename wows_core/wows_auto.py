@@ -1,7 +1,11 @@
 import datetime
+import json
+
+import aiofiles
+import aiohttp
 from .models.account import Account
 from .models.daily_statistic import PlayerDailyStatistic
-from .config import Config
+from .config import Config, get_cache
 from nonebot import get_plugin_config
 from aiowpi import WPIClient, WOWS_ASIA, WOWS_EU, WOWS_NA, WOWS_RU
 from aiowpi.error import WPIError
@@ -163,7 +167,7 @@ async def retry_request(
 )
 async def update_player_daily_statistic(retry=0):
     if retry == 0:
-        logger.info('PlayerDailyStatistic Update start')
+        logger.info("PlayerDailyStatistic Update start")
     if retry > 5:
         return
     try:
@@ -194,19 +198,19 @@ async def update_player_daily_statistic(retry=0):
         for task in detail_tasks:
             for detail in task.result():
                 if detail:
-                    aid = detail['account_id']
-                    aid2data[aid]['detail'] = detail
+                    aid = detail["account_id"]
+                    aid2data[aid]["detail"] = detail
         for task in stat_tasks:
             for stat in task.result():
                 if stat and stat[0]:
-                    aid = stat[0]['account_id']
-                    aid2data[aid]['stat'] = stat
+                    aid = stat[0]["account_id"]
+                    aid2data[aid]["stat"] = stat
 
         player_daily_statistics = []
 
         for aid, data in aid2data.items():
-            detail = data.get('detail', None)
-            stat = data.get('stat', None)
+            detail = data.get("detail", None)
+            stat = data.get("stat", None)
             if not detail and stat:
                 continue
             player = Player()
@@ -219,8 +223,32 @@ async def update_player_daily_statistic(retry=0):
         await PlayerDailyStatistic.bulk_create(
             player_daily_statistics,
         )
-        logger.success(f'PlayerDailyStatistic Update Success, num = {len(player_daily_statistics)}')
+        logger.success(
+            f"PlayerDailyStatistic Update Success, num = {len(player_daily_statistics)}"
+        )
     except Exception as e:
         logger.error(str(e))
         logger.exception("Exception")
         await update_player_daily_statistic(retry=retry + 1)
+
+
+@scheduler.scheduled_job(
+    CronTrigger(hour=0, minute=0, timezone=timezone), id="update numbers"
+)
+async def update_numbers_data():
+    try:
+        api = "https://api.wows-numbers.com/personal/rating/expected/json/"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api) as resp:
+                if 200 == resp.status:
+                    data = await resp.json()
+                    async with aiofiles.open(
+                        "wows_core/src/wows_exp.json", mode="w"
+                    ) as f:
+                        await f.write(json.dumps(data, ensure_ascii=False, indent=4))
+                        cache = get_cache()
+                        cache.clear()
+    except Exception as e:
+        logger.error(str(e))
+        logger.exception("Exception")
+        return
