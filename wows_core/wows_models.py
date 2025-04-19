@@ -398,9 +398,16 @@ class Pr:
 
         battles = ship.battles
 
-        exp_damage = expected_data["data"][str(ship_id)]["average_damage_dealt"]
-        exp_frags = expected_data["data"][str(ship_id)]["average_frags"]
-        exp_winrate = expected_data["data"][str(ship_id)]["win_rate"]
+        ship_data = expected_data["data"].get(str(ship_id), {})
+
+        if not ship_data:
+            self.pr_number = -1
+            self.color_init()
+            return
+
+        exp_damage = ship_data.get("average_damage_dealt", 0.1)
+        exp_frags = ship_data.get("average_frags", 0.1)
+        exp_winrate = ship_data.get("win_rate", 0.1)
 
         damage = ship.damage_dealt / ship.battles
         frags = ship.frags / ship.battles

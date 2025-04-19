@@ -76,8 +76,7 @@ async def updata_account_clan_tag_and_name(account, wpi, updated_accounts, retry
                 id=account["id"]
             )  # 获取数据库中对应的Account实例
             # logger.info(f'update_player: {account_instance.account_id}, clan_tag: {clan_tag}')
-            if clan_tag:
-                account_instance.clan_tag = clan_tag  # 更新clan_tag
+            account_instance.clan_tag = clan_tag  # 更新clan_tag
             if nickname:
                 account_instance.nickname = nickname
             updated_accounts.append(
@@ -163,6 +162,8 @@ async def retry_request(
     CronTrigger(hour=3, minute=0, timezone=timezone), id="update_ships"
 )
 async def update_player_daily_statistic(retry=0):
+    if retry == 0:
+        logger.info('PlayerDailyStatistic Update start')
     if retry > 5:
         return
     try:
@@ -218,6 +219,8 @@ async def update_player_daily_statistic(retry=0):
         await PlayerDailyStatistic.bulk_create(
             player_daily_statistics,
         )
+        logger.success(f'PlayerDailyStatistic Update Success, num = {len(player_daily_statistics)}')
     except Exception as e:
         logger.error(str(e))
+        logger.exception("Exception")
         await update_player_daily_statistic(retry=retry + 1)
