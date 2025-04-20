@@ -2,6 +2,7 @@
 """
 指令解析器
 """
+import asyncio
 from nonebot.rule import startswith, is_type
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, Bot, MessageSegment
 from nonebot import get_plugin_config
@@ -25,13 +26,17 @@ db_config = get_plugin_config(Config).db_config
 async def init_db():
     await Tortoise.init(
         db_url=db_config.conn,
-        modules={"models": ["wows_core.models.account", "wows_core.models.daily_statistic"]},
+        modules={
+            "models": ["wows_core.models.account", "wows_core.models.daily_statistic"]
+        },
         timezone="Asia/Shanghai",
     )
     # Generate the schema
     await Tortoise.generate_schemas()
     logger.success("init DB success")
 
+
+asyncio.run(init_db())
 
 wows = on_message(
     rule=startswith("wows") & is_type(GroupMessageEvent), priority=1, block=False
@@ -44,18 +49,19 @@ servers = {
     "na": 3,
 }
 
+
 async def get_args(messages: list[MessageSegment]) -> list[str]:
     args = []
     for message in messages:
-        if message.type == 'text':
-            args.extend(message.data['text'].split())
-        elif message.type == 'at':
+        if message.type == "text":
+            args.extend(message.data["text"].split())
+        elif message.type == "at":
             args.append(message)
     return args[1:]
 
+
 @wows.handle()
 async def handler(bot: Bot, event: GroupMessageEvent):
-    await init_db()
     try:
         args = await get_args(event.original_message)
         if not args:
@@ -67,7 +73,9 @@ async def handler(bot: Bot, event: GroupMessageEvent):
                 """当指令长度为1时只有 wows me 和 wows exboom, wows help 3种情况"""
                 match args[0]:
                     case "me":
-                        status, account_id, server, clan_tag = await wait_me(wows, event.user_id)
+                        status, account_id, server, clan_tag = await wait_me(
+                            wows, event.user_id
+                        )
                         if status:
                             img = await gen_player_image_by_account_id(
                                 account_id, server, clan_tag
@@ -78,16 +86,20 @@ async def handler(bot: Bot, event: GroupMessageEvent):
                     case "tt":
                         await tt()
                     case _:
-                        if isinstance(args[0], MessageSegment) and args[0].type == 'at':
-                            target_id = args[0].data['qq']
-                            status, account_id, server, clan_tag = await wait_me(wows, target_id)
+                        if isinstance(args[0], MessageSegment) and args[0].type == "at":
+                            target_id = args[0].data["qq"]
+                            status, account_id, server, clan_tag = await wait_me(
+                                wows, target_id
+                            )
                             if status:
                                 img = await gen_player_image_by_account_id(
                                     account_id, server, clan_tag
                                 )
                                 await wows.finish(img)
                         else:
-                            status, account_id, server = await wait_account_id(wows, args[0])
+                            status, account_id, server = await wait_account_id(
+                                wows, args[0]
+                            )
                             if status:
                                 img = await gen_player_image_by_account_id(
                                     account_id, server
@@ -102,14 +114,18 @@ async def handler(bot: Bot, event: GroupMessageEvent):
                 """
                 match args[0]:
                     case "me":
-                        if args[1] == 'recent':
-                            status, account_id, server, clan_tag = await wait_me(wows, event.user_id)
+                        if args[1] == "recent":
+                            status, account_id, server, clan_tag = await wait_me(
+                                wows, event.user_id
+                            )
                             if status:
-                                if img := await get_me_recent_image(account_id, server, clan_tag=clan_tag):
+                                if img := await get_me_recent_image(
+                                    account_id, server, clan_tag=clan_tag
+                                ):
                                     await wows.finish(img)
                                 else:
-                                    await wows.finish('找不到数据~')
-                        elif args[1] == 'recents':
+                                    await wows.finish("找不到数据~")
+                        elif args[1] == "recents":
                             raise NotImplementedError
                     case "remove":
                         raise NotImplementedError
@@ -119,19 +135,25 @@ async def handler(bot: Bot, event: GroupMessageEvent):
                         else:
                             await wows.finish("无法处理指令: " + str(args))
                     case _:
-                        if isinstance(args[0], MessageSegment) and args[0].type == 'at':
-                            target_id = args[0].data['qq']
-                            if args[1] == 'recent':
-                                status, account_id, server, clan_tag = await wait_me(wows, target_id)
+                        if isinstance(args[0], MessageSegment) and args[0].type == "at":
+                            target_id = args[0].data["qq"]
+                            if args[1] == "recent":
+                                status, account_id, server, clan_tag = await wait_me(
+                                    wows, target_id
+                                )
                                 if status:
-                                    if img := await get_me_recent_image(account_id, server, clan_tag=clan_tag):
+                                    if img := await get_me_recent_image(
+                                        account_id, server, clan_tag=clan_tag
+                                    ):
                                         await wows.finish(img)
                                     else:
-                                        await wows.finish('找不到数据~')
-                            elif args[1] == 'recents':
+                                        await wows.finish("找不到数据~")
+                            elif args[1] == "recents":
                                 raise NotImplementedError
                         else:
-                            status, account_id, server = await wait_account_id(wows, args[0])
+                            status, account_id, server = await wait_account_id(
+                                wows, args[0]
+                            )
                             if status:
                                 img = await gen_player_image_by_account_id(
                                     account_id, server
@@ -148,14 +170,20 @@ async def handler(bot: Bot, event: GroupMessageEvent):
                 """
                 match args[0]:
                     case "me":
-                        if args[1] == 'recent':
-                            date = datetime.date.today() - datetime.timedelta(days=int(args[2]))
-                            status, account_id, server, clan_tag = await wait_me(wows, event.user_id)
+                        if args[1] == "recent":
+                            date = datetime.date.today() - datetime.timedelta(
+                                days=int(args[2])
+                            )
+                            status, account_id, server, clan_tag = await wait_me(
+                                wows, event.user_id
+                            )
                             if status:
-                                if img := await get_me_recent_image(account_id, server, clan_tag=clan_tag, date=date):
+                                if img := await get_me_recent_image(
+                                    account_id, server, clan_tag=clan_tag, date=date
+                                ):
                                     await wows.finish(img)
                                 else:
-                                    await wows.finish('找不到数据~')
+                                    await wows.finish("找不到数据~")
                             pass
                         raise NotImplementedError
                     case _:
@@ -185,6 +213,7 @@ async def handler(bot: Bot, event: GroupMessageEvent):
         raise
     finally:
         await Tortoise.close_connections()
+
 
 async def tt():
     await update_player_daily_statistic()
