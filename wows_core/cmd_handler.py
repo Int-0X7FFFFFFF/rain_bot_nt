@@ -25,7 +25,7 @@ db_config = get_plugin_config(Config).db_config
 
 async def init_db():
     await Tortoise.init(
-        db_url=plugin_config.db_config.conn,
+        db_url=db_config.conn,
         modules={
             "models": ["wows_core.models.account", "wows_core.models.daily_statistic"]
         },
