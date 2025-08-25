@@ -32,7 +32,7 @@ async def init_db():
         timezone="Asia/Shanghai",
     )
     await Tortoise.generate_schemas()
-    logger.success("init DB success")
+    # logger.success("init DB success")
 
 async def close_db():
     await Tortoise.close_connections()
@@ -68,6 +68,7 @@ async def get_args(messages: list[MessageSegment]) -> list[str]:
 @wows.handle()
 async def handler(bot: Bot, event: GroupMessageEvent):
     try:
+        await init_db()
         args = await get_args(event.original_message)
         if not args:
             return
