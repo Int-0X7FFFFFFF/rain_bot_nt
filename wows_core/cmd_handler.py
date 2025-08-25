@@ -5,7 +5,7 @@
 import asyncio
 from nonebot.rule import startswith, is_type
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, Bot, MessageSegment
-from nonebot import get_plugin_config
+from nonebot import get_driver, get_plugin_config
 from nonebot.plugin import on_message
 from nonebot.exception import MatcherException
 from .config import Config
@@ -25,18 +25,23 @@ db_config = get_plugin_config(Config).db_config
 
 async def init_db():
     await Tortoise.init(
-        db_url=db_config.conn,
+        db_url=plugin_config.db_config.conn,
         modules={
             "models": ["wows_core.models.account", "wows_core.models.daily_statistic"]
         },
         timezone="Asia/Shanghai",
     )
-    # Generate the schema
     await Tortoise.generate_schemas()
     logger.success("init DB success")
 
+async def close_db():
+    await Tortoise.close_connections()
+    logger.success("close all connections")
 
-asyncio.run(init_db())
+
+
+get_driver().on_startup(init_db)
+get_driver().on_shutdown(close_db)
 
 wows = on_message(
     rule=startswith("wows") & is_type(GroupMessageEvent), priority=1, block=False
