@@ -154,7 +154,7 @@ async def wait_me(matcher: Matcher, sender_id) -> Tuple[bool, int]:
     accounts = (
         await UserInfo.filter(qid=sender_id)
         .prefetch_related("account")
-        .values("account__account_id", "account__server", "account__clan_tag")
+        .values("account__account_id", "account__server", "account__clan_tag", "account__nickname")
     )
     if len(accounts) == 1:
         return (
@@ -168,7 +168,7 @@ async def wait_me(matcher: Matcher, sender_id) -> Tuple[bool, int]:
         return False, None, None
     msg = """找到多个账号\n"""
     for index, account in enumerate(accounts):
-        msg += f"[{index}]: {account['nickname']}  {Server2str[account['server']]}\n"
+        msg += f"[{index}]: {account['account__nickname']}  {Server2str[account['account__server']]}\n"
     msg += "选一个吧"
     await matcher.send(msg)
 
