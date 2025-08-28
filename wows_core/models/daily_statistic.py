@@ -82,7 +82,7 @@ class PlayerDailyStatistic(Model):
             date = date if date else await PlayerDailyStatistic.get_recent_date(account.id)
             if not date:
                 return
-            ship_stats = await PlayerDailyStatistic.filter(account_id=account_id, date=date)
+            ship_stats = await PlayerDailyStatistic.filter(account_id=account.id, date=date)
             user = User()
             user.date = date
             ship_list = []
